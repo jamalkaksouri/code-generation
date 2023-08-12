@@ -32,11 +32,12 @@ import (
 const (
 	minPrefixLength = 2
 	maxPrefixLength = 6
-	minCodeLength   = 2
+	minCodeLength   = 4
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
 	batchSize       = 100
+	numWorkers      = 100
 
 	copyrighter = `
 	Program Name: Code Generator
@@ -112,6 +113,10 @@ func worker(id int, prefix string, length int, codes chan<- string, done <-chan 
 	// Batch codes to reduce contention
 	batch := make([]string, batchSize)
 
+	// Create buffer timer (100ms)
+	timer := time.NewTicker(100 * time.Millisecond)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-done:
@@ -130,7 +135,10 @@ func worker(id int, prefix string, length int, codes chan<- string, done <-chan 
 			// Send the batch of codes to the channel
 			for _, code := range batch {
 				if code != "" {
-					codes <- code
+					select {
+					case codes <- code:
+					case <-timer.C:
+					}
 				}
 			}
 
@@ -241,7 +249,7 @@ func main() {
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		percentage := 0.0
 
-		codes := make(chan string)
+		codes := make(chan string, 100)
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
 		var mu sync.Mutex
@@ -249,8 +257,6 @@ func main() {
 		var once sync.Once
 
 		// Create worker pool
-		numWorkers := 100
-
 		for i := 0; i < numWorkers; i++ {
 			wg.Add(1)
 			go worker(i, config.Prefix, config.Length, codes, done, &wg, &mu, seenCodes, &once)
