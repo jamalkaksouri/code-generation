@@ -34,7 +34,7 @@ const (
 	maxPrefixLength = 6
 	minCodeLength   = 2
 	maxCodeLength   = 16
-	maxNumCodes     = 10000000
+	maxNumCodes     = 100000000
 	charset         = "0123456789"
 	batchSize       = 100
 
@@ -144,8 +144,8 @@ func main() {
 	var config AppConfig
 
 	flag.StringVar(&config.Prefix, "p", "", "Add prefix to the codes[2-6 characters]")
-	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 Numbers]")
-	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-10,000,000 Codes]")
+	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
+	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-100 million]")
 	flag.BoolVar(&config.LineNumbers, "a", false, "Add line numbers to the file")
 	flag.BoolVar(&config.Version, "v", false, "Application version")
 	flag.BoolVar(&config.Dev, "i", false, "About")
@@ -165,7 +165,7 @@ func main() {
 
 	if flag.NFlag() == 0 {
 		color.Green("%s %s %s %s %s", "\t\nUsage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
-		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 Numbers)\t\n\t-n\tThe number of generated codes (1-10,000,000 Codes)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tApplication version\t\n\t-i\tAbout\t\n\t\n")
+		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tApplication version\t\n\t-i\tAbout\t\n\t\n")
 		color.Yellow("Tip: To stop code generation midway, simply press [CTRL + C]\t\n")
 		return
 	}
