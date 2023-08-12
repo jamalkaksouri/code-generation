@@ -36,8 +36,8 @@ const (
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
-	batchSize       = 100
 	numWorkers      = 100
+	codesBuffer     = 100
 
 	copyrighter = `
 	Program Name: Code Generator
@@ -102,48 +102,22 @@ func calculatePossibleOutcomes(digits int) int {
 	return int(math.Pow10(digits))
 }
 
-func worker(id int, prefix string, length int, codes chan<- string, done <-chan struct{}, wg *sync.WaitGroup, mu *sync.Mutex, seenCodes map[string]bool, once *sync.Once) {
+func worker(id int, prefix string, length int, codes chan<- string, done <-chan struct{}, wg *sync.WaitGroup, mu *sync.Mutex, seenCodes map[string]bool) {
 	defer wg.Done()
-
-	// Initialize resources only once
-	once.Do(func() {
-		seenCodes = make(map[string]bool)
-	})
-
-	// Batch codes to reduce contention
-	batch := make([]string, batchSize)
-
-	// Create buffer timer (100ms)
-	timer := time.NewTicker(100 * time.Millisecond)
-	defer timer.Stop()
 
 	for {
 		select {
 		case <-done:
 			return // Exit the worker when done signal is received
 		default:
-			for i := 0; i < batchSize; i++ {
-				newCode := generateCode(prefix, length)
-				mu.Lock()
-				if !seenCodes[newCode] {
-					seenCodes[newCode] = true
-					batch[i] = newCode
-				}
-				mu.Unlock()
-			}
+			newCode := generateCode(prefix, length)
+			mu.Lock()
+			if !seenCodes[newCode] {
+				seenCodes[newCode] = true
+				codes <- newCode
 
-			// Send the batch of codes to the channel
-			for _, code := range batch {
-				if code != "" {
-					select {
-					case codes <- code:
-					case <-timer.C:
-					}
-				}
 			}
-
-			// Clear the batch for the next iteration
-			batch = make([]string, batchSize)
+			mu.Unlock()
 		}
 	}
 }
@@ -207,6 +181,12 @@ func main() {
 			return
 		}
 		psb := calculatePossibleOutcomes(config.Length)
+		if psb == config.NumCodes {
+			c := color.New(color.BgYellow, color.FgBlack).Sprint("Attention:")
+			att := color.New(color.FgHiYellow).Add(color.Italic).Sprint("Code generation and saving may take a bit longer than usual based on the provided parameters!")
+			fmt.Printf("%s %s\t\n",
+				c, att)
+		}
 		if config.NumCodes > psb {
 			c := color.New(color.BgYellow, color.FgBlack).Sprint("Warning")
 			fmt.Printf("%s Maximum [%s] numbers can be created with a length of [%d]\t\n",
@@ -249,17 +229,17 @@ func main() {
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		percentage := 0.0
 
-		codes := make(chan string, 100)
+		codes := make(chan string, codesBuffer)
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 		seenCodes := make(map[string]bool)
-		var once sync.Once
+		// var once sync.Once
 
 		// Create worker pool
 		for i := 0; i < numWorkers; i++ {
 			wg.Add(1)
-			go worker(i, config.Prefix, config.Length, codes, done, &wg, &mu, seenCodes, &once)
+			go worker(i, config.Prefix, config.Length, codes, done, &wg, &mu, seenCodes)
 		}
 
 		// Write generated codes to file
