@@ -41,7 +41,7 @@ const (
 
 	copyrighter = `
 	Program Name: Code Generator
-	Version: 1.0.0
+	Version: 1.1.0
 	Author: Jamal Kaksouri
 	Email: jamal.kaksouri@gmail.com
 	Description: A tool for generating unique, randomized codes
@@ -64,66 +64,9 @@ type AppConfig struct {
 	AppVer        string
 }
 
-func generateCode(prefix string, length int) string {
-	rand.NewSource(time.Now().UnixNano())
-
-	codeLen := length
-	code := fmt.Sprintf("%s-", prefix)
-
-	for i := 0; i < codeLen; i++ {
-		code += string(charset[rand.Intn(len(charset))])
-	}
-	return code
-}
-
-func validatePrefix(prefix string) bool {
-	return len(prefix) >= minPrefixLength && len(prefix) <= maxPrefixLength
-}
-
-func validateLength(length int) bool {
-	return length >= minCodeLength && length <= maxCodeLength
-}
-
-func GenerateHash(data string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(data), 14)
-	return string(bytes), err
-}
-
-func sanitizeKey(input string) string {
-	pattern := "[^a-zA-Z]+"
-	re := regexp.MustCompile(pattern)
-	sanitizedKey := re.ReplaceAllString(input, "")
-	output := strings.ToLower(sanitizedKey)
-
-	return output[4:30]
-}
-
-func calculatePossibleOutcomes(digits int) int {
-	return int(math.Pow10(digits))
-}
-
-func worker(id int, prefix string, length int, codes chan<- string, done <-chan struct{}, wg *sync.WaitGroup, mu *sync.Mutex, seenCodes map[string]bool) {
-	defer wg.Done()
-
-	for {
-		select {
-		case <-done:
-			return // Exit the worker when done signal is received
-		default:
-			newCode := generateCode(prefix, length)
-			mu.Lock()
-			if !seenCodes[newCode] {
-				seenCodes[newCode] = true
-				codes <- newCode
-
-			}
-			mu.Unlock()
-		}
-	}
-}
-
 func main() {
 	var config AppConfig
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.StringVar(&config.Prefix, "p", "", "Add prefix to the codes[2-6 characters]")
 	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
@@ -138,11 +81,11 @@ func main() {
 	config.HelpF = "Each time you use a code, delete it. You can use [CTRL + X]"
 	config.AppCommand = "codegen"
 	config.OSSpecDir = "Documents"
-	config.AppVer = "Code generator version 1.0.0 windows"
+	config.AppVer = "Code generator version 1.1.0 windows"
 
 	if runtime.GOOS == "linux" {
 		config.OSSpecDir = ""
-		config.AppVer = "Code generator version 1.0.0 linux"
+		config.AppVer = "Code generator version 1.1.0 linux"
 	}
 
 	if flag.NFlag() == 0 {
@@ -221,7 +164,7 @@ func main() {
 		}
 		defer file.Close()
 
-		loadingTicker := time.NewTicker(120 * time.Millisecond)
+		loadingTicker := time.NewTicker(100 * time.Millisecond)
 		// loadingCounter := 0
 		ready := false
 
@@ -232,19 +175,21 @@ func main() {
 		codes := make(chan string, codesBuffer)
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
-		var mu sync.Mutex
-		seenCodes := make(map[string]bool)
-		// var once sync.Once
+		seenCodes := sync.Map{}
 
 		// Create worker pool
 		for i := 0; i < numWorkers; i++ {
 			wg.Add(1)
-			go worker(i, config.Prefix, config.Length, codes, done, &wg, &mu, seenCodes)
+			go worker(i, config.Prefix, config.Length, codes, done, &wg, &seenCodes)
 		}
 
 		// Write generated codes to file
 		go func() {
-			_, _ = fmt.Fprintf(file, "%s %s %v\t\n%s\t\n%s\t\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
+			// Create a buffer to accumulate the generated codes
+			var codesBuffer strings.Builder
+
+			// Generate the initial header and add it to the buffer
+			_, _ = fmt.Fprintf(&codesBuffer, "%s %s %v\t\n%s\t\n%s\t\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
 
 			startTime := time.Now()
 			for i := 1; i <= config.NumCodes; i++ {
@@ -256,15 +201,25 @@ func main() {
 				if !ok {
 					break // Channel is closed
 				}
+
 				if config.LineNumbers {
-					_, _ = fmt.Fprintf(file, "%d: %s\t\n", i, code)
+					_, _ = fmt.Fprintf(&codesBuffer, "%d: %s\t\n", i, code)
 				} else {
-					_, _ = fmt.Fprintf(file, "%s\t\n", code)
+					_, _ = fmt.Fprintf(&codesBuffer, "%s\t\n", code)
 				}
 				percentage = float64(i) / float64(config.NumCodes) * 100
 			}
+
 			close(done) // Signal workers to exit
 			ready = true
+
+			// After generating all codes, write them to the file
+			_, err := file.WriteString(codesBuffer.String())
+			if err != nil {
+				c := color.New(color.BgRed, color.FgBlack).Sprint("Error!")
+				fmt.Printf("Issue saving codes to file! %s%v\t\n", c, err)
+				return
+			}
 		}()
 
 		for {
@@ -319,6 +274,61 @@ func main() {
 				c := color.New(color.BgRed, color.FgBlack).Sprint("Interrupted!")
 				fmt.Printf("%s Code generation interrupted. Cleaned up generated file.\t\n", c)
 				os.Exit(0)
+			}
+		}
+	}
+}
+
+func generateCode(prefix string, length int) string {
+	rand.NewSource(time.Now().UnixNano())
+
+	codeLen := length
+	code := fmt.Sprintf("%s-", prefix)
+
+	for i := 0; i < codeLen; i++ {
+		code += string(charset[rand.Intn(len(charset))])
+	}
+	return code
+}
+
+func validatePrefix(prefix string) bool {
+	return len(prefix) >= minPrefixLength && len(prefix) <= maxPrefixLength
+}
+
+func validateLength(length int) bool {
+	return length >= minCodeLength && length <= maxCodeLength
+}
+
+func GenerateHash(data string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(data), 14)
+	return string(bytes), err
+}
+
+func sanitizeKey(input string) string {
+	pattern := "[^a-zA-Z]+"
+	re := regexp.MustCompile(pattern)
+	sanitizedKey := re.ReplaceAllString(input, "")
+	output := strings.ToLower(sanitizedKey)
+
+	return output[4:30]
+}
+
+func calculatePossibleOutcomes(digits int) int {
+	return int(math.Pow10(digits))
+}
+
+func worker(id int, prefix string, length int, codes chan<- string, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
+	defer wg.Done()
+
+	for {
+		select {
+		case <-done:
+			return // Exit the worker when done signal is received
+		default:
+			newCode := generateCode(prefix, length)
+			_, loaded := seenCodes.LoadOrStore(newCode, struct{}{})
+			if !loaded {
+				codes <- newCode
 			}
 		}
 	}
