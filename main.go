@@ -36,8 +36,8 @@ const (
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
-	numWorkers      = 100
-	codesBuffer     = 100
+	numWorkers      = 500
+	codesBuffer     = 1000
 
 	copyrighter = `
 	Program Name: Code Generator
@@ -89,9 +89,9 @@ func main() {
 	}
 
 	if flag.NFlag() == 0 {
-		color.Green("%s %s %s %s %s", "\t\nUsage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
+		color.Green("%s %s %s %s %s", "Usage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
 		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tApplication version\t\n\t-i\tAbout\t\n\t\n")
-		color.Yellow("Tip: To stop code generation midway, simply press [CTRL + C]\t\n")
+		color.Yellow("Tip: To stop code generation midway, simply press [CTRL + C]\n")
 		return
 	}
 
@@ -110,29 +110,29 @@ func main() {
 	if !config.Version && !config.Dev {
 		if !validatePrefix(config.Prefix) {
 			c := color.New(color.BgRed, color.FgBlack).Sprint("Error")
-			fmt.Printf("%s Prefix length should be between %d and %d characters\t\n", c, minPrefixLength, maxPrefixLength)
+			fmt.Printf("%s Prefix length should be between %d and %d characters\n", c, minPrefixLength, maxPrefixLength)
 			return
 		}
 		if !validateLength(config.Length) {
 			c := color.New(color.BgRed, color.FgBlack).Sprint("Error")
-			fmt.Printf("%s Code length should be between %d and %d digits\t\n", c, minCodeLength, maxCodeLength)
+			fmt.Printf("%s Code length should be between %d and %d digits\n", c, minCodeLength, maxCodeLength)
 			return
 		}
 		if config.NumCodes <= 0 || config.NumCodes > maxNumCodes {
 			c := color.New(color.BgRed, color.FgBlack).Sprint("Error")
-			fmt.Printf("%s Number of codes should be between 1 and %d\t\n", c, maxNumCodes)
+			fmt.Printf("%s Number of codes should be between 1 and %d\n", c, maxNumCodes)
 			return
 		}
 		psb := calculatePossibleOutcomes(config.Length)
 		if psb == config.NumCodes {
 			c := color.New(color.BgYellow, color.FgBlack).Sprint("Attention:")
 			att := color.New(color.FgHiYellow).Add(color.Italic).Sprint("Code generation and saving may take a bit longer than usual based on the provided parameters!")
-			fmt.Printf("%s %s\t\n",
+			fmt.Printf("%s %s\n",
 				c, att)
 		}
 		if config.NumCodes > psb {
 			c := color.New(color.BgYellow, color.FgBlack).Sprint("Warning")
-			fmt.Printf("%s Maximum [%s] numbers can be created with a length of [%d]\t\n",
+			fmt.Printf("%s Maximum [%s] numbers can be created with a length of [%d]\n",
 				c, humanize.Comma(int64(psb)), config.Length)
 			return
 		}
@@ -189,7 +189,7 @@ func main() {
 			var codesBuffer strings.Builder
 
 			// Generate the initial header and add it to the buffer
-			_, _ = fmt.Fprintf(&codesBuffer, "%s %s %v\t\n%s\t\n%s\t\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
+			_, _ = fmt.Fprintf(&codesBuffer, "%s %s %v\n%s\n%s\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
 
 			startTime := time.Now()
 			for i := 1; i <= config.NumCodes; i++ {
@@ -203,9 +203,9 @@ func main() {
 				}
 
 				if config.LineNumbers {
-					_, _ = fmt.Fprintf(&codesBuffer, "%d: %s\t\n", i, code)
+					_, _ = fmt.Fprintf(&codesBuffer, "%d: %s\n", i, code)
 				} else {
-					_, _ = fmt.Fprintf(&codesBuffer, "%s\t\n", code)
+					_, _ = fmt.Fprintf(&codesBuffer, "%s\n", code)
 				}
 				percentage = float64(i) / float64(config.NumCodes) * 100
 			}
@@ -217,7 +217,7 @@ func main() {
 			_, err := file.WriteString(codesBuffer.String())
 			if err != nil {
 				c := color.New(color.BgRed, color.FgBlack).Sprint("Error!")
-				fmt.Printf("Issue saving codes to file! %s%v\t\n", c, err)
+				fmt.Printf("Issue saving codes to file! %s%v\r\n", c, err)
 				return
 			}
 		}()
@@ -233,10 +233,10 @@ func main() {
 
 				if ready {
 					clearLine()
-					color.Yellow("Generated codes saved to %s\t\n", filePath)
+					color.Yellow("Generated codes saved to %s\r\n", filePath)
 					if runtime.GOOS == "windows" {
 						c := color.New(color.BgGreen, color.FgBlack).Sprint("Press 'O' to open directory")
-						fmt.Printf("%s or any key to exit\t\n", c)
+						fmt.Printf("%s or any key to exit\r\n", c)
 						err := keyboard.Open()
 						if err != nil {
 							log.Fatal(err)
@@ -272,7 +272,7 @@ func main() {
 				}
 				clearLine()
 				c := color.New(color.BgRed, color.FgBlack).Sprint("Interrupted!")
-				fmt.Printf("%s Code generation interrupted. Cleaned up generated file.\t\n", c)
+				fmt.Printf("%s Code generation interrupted. Cleaned up generated file.\r\n", c)
 				os.Exit(0)
 			}
 		}
@@ -344,7 +344,7 @@ func openDirectoryInExplorer(directory string) {
 	case "windows":
 		cmd = exec.Command("explorer", directory)
 	default:
-		fmt.Printf("Unsupported operating system: %s\n", runtimeOS)
+		fmt.Printf("Unsupported operating system: %s\r\n", runtimeOS)
 		return
 	}
 

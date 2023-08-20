@@ -32,8 +32,3 @@ func FormatDuration(d time.Duration) string {
 		return fmt.Sprintf("%02d second", seconds)
 	}
 }
-
-// func PrintProgress(currentIteration int, remainingTime time.Duration) {
-// 	progressFormat := "\rIterations: %d - Remaining Time: %s"
-// 	fmt.Printf(progressFormat, currentIteration, FormatDuration(remainingTime))
-// }
