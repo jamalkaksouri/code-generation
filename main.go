@@ -226,7 +226,7 @@ func main() {
 			select {
 			case <-loadingTicker.C:
 				info := color.New(color.FgBlack, color.BgGreen).Sprintf("[ST: %.2f%% | RM: %s]", percentage, utils.FormatDuration(config.RemainingTime))
-				fmt.Printf("%10s\r%s Generating %s codes with prefix '%s' %s", "", loadingAnimation(loadingCounter), humanize.Comma(int64(config.NumCodes)), config.Prefix, info)
+				fmt.Printf("\r%s Generating %s codes with prefix '%s' %s%10s", loadingAnimation(loadingCounter), humanize.Comma(int64(config.NumCodes)), config.Prefix, info, "")
 				loadingCounter = (loadingCounter + 1) % 10
 
 				if ready {
