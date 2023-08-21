@@ -226,7 +226,6 @@ func main() {
 			select {
 			case <-loadingTicker.C:
 				fmt.Print("\033[?25l")
-				defer fmt.Print("\033[?25h") // Show cursor before program exits
 
 				info := color.New(color.FgBlack, color.BgGreen).Sprintf("[ST: %.2f%% | RM: %s]", percentage, utils.FormatDuration(config.RemainingTime))
 				fmt.Printf("\r%s Generating %s codes with prefix '%s' %s%10s", loadingAnimation(loadingCounter), humanize.Comma(int64(config.NumCodes)), config.Prefix, info, "")
@@ -234,6 +233,7 @@ func main() {
 
 				if ready {
 					clearLine()
+					fmt.Print("\033[?25h")
 					color.Yellow("Generated codes saved to %s\r\n", filePath)
 					if runtime.GOOS == "windows" {
 						c := color.New(color.BgGreen, color.FgBlack).Sprint("Press 'O' to open directory")
@@ -259,6 +259,7 @@ func main() {
 					return
 				}
 			case <-sigChan:
+				fmt.Print("\033[?25h")
 				if file != nil {
 					file.Close()
 				}
