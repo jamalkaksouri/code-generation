@@ -36,8 +36,8 @@ const (
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
-	numWorkers      = 500
-	codesBuffer     = 1000
+	numWorkers      = 200
+	// codesBuffer     = 1000
 
 	copyrighter = `
 	Program Name: Code Generator
@@ -165,14 +165,14 @@ func main() {
 		defer file.Close()
 
 		loadingTicker := time.NewTicker(100 * time.Millisecond)
-		// loadingCounter := 0
+		loadingCounter := 0
 		ready := false
 
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		percentage := 0.0
 
-		codes := make(chan string, codesBuffer)
+		codes := make(chan string)
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
 		seenCodes := sync.Map{}
@@ -226,10 +226,8 @@ func main() {
 			select {
 			case <-loadingTicker.C:
 				info := color.New(color.FgBlack, color.BgGreen).Sprintf("[ST: %.2f%% | RM: %s]", percentage, utils.FormatDuration(config.RemainingTime))
-				fmt.Printf("%10s\rGenerating %s codes with prefix '%s' %s", "", humanize.Comma(int64(config.NumCodes)), config.Prefix, info)
-
-				// fmt.Printf("\rGenerating %d codes with prefix %s and length %d [status %.2f%% - %s]%s", numCodes, prefix, length, percentage, utils.FormatDuration(remainingTime), loadingAnimation(loadingCounter))
-				// loadingCounter = (loadingCounter + 1) % 12
+				fmt.Printf("%10s\r%s Generating %s codes with prefix '%s' %s", "", loadingAnimation(loadingCounter), humanize.Comma(int64(config.NumCodes)), config.Prefix, info)
+				loadingCounter = (loadingCounter + 1) % 10
 
 				if ready {
 					clearLine()
@@ -353,22 +351,7 @@ func openDirectoryInExplorer(directory string) {
 	_ = cmd.Run()
 }
 
-// func loadingAnimation(counter int) string {
-// 	animation1 := [12]string{" ●○○○○○", " ●●○○○○", " ●●●○○○", " ●●●●○○", " ●●●●●○", " ●●●●●●", " ●●●●●○", " ●●●●○○", " ●●●○○○", " ●●○○○○", " ●○○○○○", " ○○○○○○"}
-
-// 	animation2 := [12]string{" >_____", " _>____", " __>___", " ___>__", " ____>_", " _____>", " _____<", " ____<_", " ___<__", " __<___", " _<____", " <_____"}
-
-// 	platform, _, _, err := host.PlatformInformation()
-// 	if err != nil {
-// 		log.Printf("OS not detected! %s", err)
-// 	}
-
-// 	re := regexp.MustCompile(`\b10\b|\b11\b|\b12\b`)
-// 	matches := re.FindAllString(platform, -1)
-
-// 	if len(matches) > 0 {
-// 		return animation1[counter]
-// 	}
-
-// 	return animation2[counter]
-// }
+func loadingAnimation(counter int) string {
+	animation := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	return animation[counter]
+}
