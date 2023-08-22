@@ -1,13 +1,14 @@
 # A CLI tool for generating unique, randomized codes
 
 **FAST & OPTIMIZED**
+<p align="center">
+  
+![codegen_pic02](https://github.com/jamalkaksouri/code-generation/assets/12379287/b274d0a0-fb9d-4f0b-a66b-4e61112a96e0)
 
-![pic1](https://github.com/jamalkaksouri/code-generation/assets/12379287/91ebdf38-1c64-4d9a-89bd-48c6232fa031)
+![codegen_pic03](https://github.com/jamalkaksouri/code-generation/assets/12379287/61793eee-8b91-4e80-ba0c-92ff29fbc3f6)
 
-![codegen_snappshot](https://github.com/jamalkaksouri/code-generation/assets/12379287/c88cd87f-ff19-433a-9c8d-accd821d6b94)
+</p>
 
-
-![codegen_pic03](https://github.com/jamalkaksouri/code-generation/assets/12379287/77e6a4b5-19f1-4a86-9eef-9ec01dc35713)
 
 
 
