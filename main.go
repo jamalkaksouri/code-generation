@@ -24,11 +24,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-/*
-	In this project, the sync.WaitGroup library is not used
-	because the management of goroutines is done with the select statement
-*/
-
 const (
 	minPrefixLength = 2
 	maxPrefixLength = 6
@@ -38,14 +33,6 @@ const (
 	charset         = "0123456789"
 	numWorkers      = 200
 	// codesBuffer     = 1000
-
-	copyrighter = `
-	Program Name: Code Generator
-	Version: 1.1.0
-	Author: Jamal Kaksouri
-	Email: jamal.kaksouri@gmail.com
-	Description: A tool for generating unique, randomized codes
-	`
 )
 
 type AppConfig struct {
@@ -54,7 +41,6 @@ type AppConfig struct {
 	NumCodes      int
 	LineNumbers   bool
 	Version       bool
-	Dev           bool
 	CodeTx        string
 	FLineF        string
 	HelpF         string
@@ -72,8 +58,7 @@ func main() {
 	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
 	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-100 million]")
 	flag.BoolVar(&config.LineNumbers, "a", false, "Add line numbers to the file")
-	flag.BoolVar(&config.Version, "v", false, "Application version")
-	flag.BoolVar(&config.Dev, "i", false, "About")
+	flag.BoolVar(&config.Version, "v", false, "About")
 	flag.Parse()
 
 	config.CodeTx = "CODES"
@@ -81,33 +66,29 @@ func main() {
 	config.HelpF = "Each time you use a code, delete it. You can use [CTRL + X]"
 	config.AppCommand = "codegen"
 	config.OSSpecDir = "Documents"
-	config.AppVer = "Code generator version 1.1.0 windows"
 
 	if runtime.GOOS == "linux" {
 		config.OSSpecDir = ""
-		config.AppVer = "Code generator version 1.1.0 linux"
 	}
 
 	if flag.NFlag() == 0 {
+		Banner()
+		fmt.Println()
 		color.Green("%s %s %s %s %s", "Usage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
-		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tApplication version\t\n\t-i\tAbout\t\n\t\n")
+		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tAbout\t\n\t\n")
 		color.Yellow("Tip: To stop code generation midway, simply press [CTRL + C]\n")
 		return
 	}
 
 	if config.Version {
-		color.Green(config.AppVer)
-	}
-
-	if config.Dev {
-		color.Green(copyrighter)
+		Banner()
 	}
 
 	if config.NumCodes == 1 {
 		config.CodeTx = "CODE"
 		config.FLineF = "code were generated at"
 	}
-	if !config.Version && !config.Dev {
+	if !config.Version {
 		if !validatePrefix(config.Prefix) {
 			c := color.New(color.BgRed, color.FgBlack).Sprint("Error")
 			fmt.Printf("%s Prefix length should be between %d and %d characters\n", c, minPrefixLength, maxPrefixLength)
