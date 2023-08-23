@@ -25,7 +25,7 @@ func putAsciiArt(s string) {
 			color.Set(color.BgCyan)
 			d = " "
 		case " ":
-			color.Set(color.BgBlack)
+			color.Unset()
 			d = " "
 		case "\n":
 			color.Unset()
