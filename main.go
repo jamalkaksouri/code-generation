@@ -65,10 +65,6 @@ func main() {
 	var config AppConfig
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	flag.StringVar(&config.Prefix, "p", "", "Add prefix to the codes[2-6 characters]")
 	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
 	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-100 million]")
