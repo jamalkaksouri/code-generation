@@ -32,7 +32,7 @@ const (
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
-	numWorkers      = 500
+	numWorkers      = 200
 )
 
 type AppConfig struct {
@@ -153,7 +153,6 @@ func main() {
 			color.Red("Error creating file: %v", err)
 			return
 		}
-		defer file.Close()
 
 		loadingTicker := time.NewTicker(100 * time.Millisecond)
 		loadingCounter := 0
@@ -202,12 +201,6 @@ func main() {
 			close(done) // Signal workers to exit
 			ready = true
 			codesBuffer.Flush()
-
-			if err != nil {
-				c := color.New(color.BgRed, color.FgBlack).Sprint("Error!")
-				fmt.Printf("Issue saving codes to file! %s%v\r\n", c, err)
-				return
-			}
 		}()
 
 		for {
@@ -223,6 +216,7 @@ func main() {
 					clearLine()
 					fmt.Print("\033[?25h")
 					color.Yellow("Generated codes saved to %s\r\n", filePath)
+					file.Close()
 					if runtime.GOOS == "windows" {
 						c := color.New(color.BgGreen, color.FgBlack).Sprint("Press 'O' to open directory")
 						fmt.Printf("%s or any key to exit\r\n", c)
