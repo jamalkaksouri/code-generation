@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"code-generation/utils"
 	"flag"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -31,8 +33,7 @@ const (
 	maxCodeLength   = 16
 	maxNumCodes     = 100000000
 	charset         = "0123456789"
-	numWorkers      = 200
-	// codesBuffer     = 1000
+	numWorkers      = 500
 )
 
 type AppConfig struct {
@@ -50,9 +51,23 @@ type AppConfig struct {
 	AppVer        string
 }
 
+type CodeResult struct {
+	Code string
+}
+
+var stringBuilderPool = sync.Pool{
+	New: func() interface{} {
+		return &strings.Builder{}
+	},
+}
+
 func main() {
 	var config AppConfig
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	flag.StringVar(&config.Prefix, "p", "", "Add prefix to the codes[2-6 characters]")
 	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
@@ -72,7 +87,7 @@ func main() {
 	}
 
 	if flag.NFlag() == 0 {
-		Banner()
+		utils.Banner()
 		fmt.Println()
 		color.Green("%s %s %s %s %s", "Usage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
 		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tAbout\t\n\t\n")
@@ -81,7 +96,7 @@ func main() {
 	}
 
 	if config.Version {
-		Banner()
+		utils.Banner()
 	}
 
 	if config.NumCodes == 1 {
@@ -118,7 +133,7 @@ func main() {
 			return
 		}
 
-		hash, err := GenerateHash(generateCode("X", 12))
+		hash, err := GenerateHash(generateCodeWithPool("X", 12))
 		if err != nil {
 			log.Fatalf("error %s", err)
 		}
@@ -153,24 +168,24 @@ func main() {
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		percentage := 0.0
 
-		codes := make(chan string)
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
 		seenCodes := sync.Map{}
 
+		resultChan := make(chan CodeResult, numWorkers) // Buffered channel for worker results
+
 		// Create worker pool
 		for i := 0; i < numWorkers; i++ {
 			wg.Add(1)
-			go worker(i, config.Prefix, config.Length, codes, done, &wg, &seenCodes)
+			go worker(i, config.Prefix, config.Length, resultChan, done, &wg, &seenCodes)
 		}
 
 		// Write generated codes to file
 		go func() {
-			// Create a buffer to accumulate the generated codes
-			var codesBuffer strings.Builder
+			codesBuffer := bufio.NewWriter(file)
 
 			// Generate the initial header and add it to the buffer
-			_, _ = fmt.Fprintf(&codesBuffer, "%s %s %v\n%s\n%s\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
+			_, _ = fmt.Fprintf(codesBuffer, "%s %s %v\n%s\n%s\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
 
 			startTime := time.Now()
 			for i := 1; i <= config.NumCodes; i++ {
@@ -178,24 +193,21 @@ func main() {
 				remainingIterations := config.NumCodes - i
 				config.RemainingTime = utils.CalculateRemainingTime(elapsedTime, i, remainingIterations)
 
-				code, ok := <-codes
-				if !ok {
-					break // Channel is closed
-				}
+				codeResult := <-resultChan
+				code := codeResult.Code
 
 				if config.LineNumbers {
-					_, _ = fmt.Fprintf(&codesBuffer, "%d: %s\n", i, code)
+					_, _ = fmt.Fprintf(codesBuffer, "%d: %s\n", i, code)
 				} else {
-					_, _ = fmt.Fprintf(&codesBuffer, "%s\n", code)
+					_, _ = fmt.Fprintf(codesBuffer, "%s\n", code)
 				}
 				percentage = float64(i) / float64(config.NumCodes) * 100
 			}
 
 			close(done) // Signal workers to exit
 			ready = true
+			codesBuffer.Flush()
 
-			// After generating all codes, write them to the file
-			_, err := file.WriteString(codesBuffer.String())
 			if err != nil {
 				c := color.New(color.BgRed, color.FgBlack).Sprint("Error!")
 				fmt.Printf("Issue saving codes to file! %s%v\r\n", c, err)
@@ -262,16 +274,23 @@ func main() {
 	}
 }
 
-func generateCode(prefix string, length int) string {
+func init() {
 	rand.NewSource(time.Now().UnixNano())
+}
 
-	codeLen := length
-	code := fmt.Sprintf("%s-", prefix)
+func generateCodeWithPool(prefix string, length int) string {
+	builder := stringBuilderPool.Get().(*strings.Builder)
+	defer stringBuilderPool.Put(builder)
 
-	for i := 0; i < codeLen; i++ {
-		code += string(charset[rand.Intn(len(charset))])
+	builder.Reset()
+	builder.WriteString(prefix)
+	builder.WriteString("-")
+
+	for i := 0; i < length; i++ {
+		builder.WriteByte(charset[rand.Intn(len(charset))])
 	}
-	return code
+
+	return builder.String()
 }
 
 func validatePrefix(prefix string) bool {
@@ -300,7 +319,7 @@ func calculatePossibleOutcomes(digits int) int {
 	return int(math.Pow10(digits))
 }
 
-func worker(id int, prefix string, length int, codes chan<- string, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
+func worker(id int, prefix string, length int, resultChan chan<- CodeResult, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
 	defer wg.Done()
 
 	for {
@@ -308,11 +327,12 @@ func worker(id int, prefix string, length int, codes chan<- string, done <-chan 
 		case <-done:
 			return // Exit the worker when done signal is received
 		default:
-			newCode := generateCode(prefix, length)
+			newCode := generateCodeWithPool(prefix, length)
 			_, loaded := seenCodes.LoadOrStore(newCode, struct{}{})
 			if !loaded {
-				codes <- newCode
+				resultChan <- CodeResult{Code: newCode}
 			}
+
 		}
 	}
 }
