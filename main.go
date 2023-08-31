@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"code-generation/utils"
 	"flag"
 	"fmt"
 	"log"
@@ -19,6 +18,10 @@ import (
 	"syscall"
 	"time"
 
+	"code-generation/utils"
+
+	"github.com/bits-and-blooms/bloom/v3"
+
 	"github.com/dustin/go-humanize"
 	"github.com/eiannone/keyboard"
 	"github.com/fatih/color"
@@ -26,13 +29,14 @@ import (
 )
 
 const (
-	minPrefixLength = 2
-	maxPrefixLength = 6
-	minCodeLength   = 4
-	maxCodeLength   = 16
-	maxNumCodes     = 100000000
-	charset         = "0123456789"
-	numWorkers      = 200
+	minPrefixLength   = 2
+	maxPrefixLength   = 6
+	minCodeLength     = 4
+	maxCodeLength     = 16
+	maxNumCodes       = 100000000
+	charset           = "0123456789"
+	numWorkers        = 200
+	falsePositiveRate = 0.000000001
 )
 
 type AppConfig struct {
@@ -282,6 +286,35 @@ func generateCodeWithPool(prefix string, length int) string {
 	return builder.String()
 }
 
+var filter = bloom.NewWithEstimates(maxNumCodes, falsePositiveRate)
+
+func worker(id int, prefix string, length int, resultChan chan<- CodeResult, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
+	defer wg.Done()
+
+	duplicatesFound := 0
+	uniqueCodesGenerated := 0
+
+	for {
+		select {
+		case <-done:
+			return // Exit the worker when done signal is received
+		default:
+			for uniqueCodesGenerated < maxNumCodes {
+				newCode := generateCodeWithPool(prefix, length)
+				if filter.Test([]byte(newCode)) {
+					// Duplicate found
+					duplicatesFound++
+				} else {
+					// Not a duplicate, add to the filter
+					filter.Add([]byte(newCode))
+					resultChan <- CodeResult{Code: newCode}
+					uniqueCodesGenerated++
+				}
+			}
+		}
+	}
+}
+
 func validatePrefix(prefix string) bool {
 	return len(prefix) >= minPrefixLength && len(prefix) <= maxPrefixLength
 }
@@ -306,24 +339,6 @@ func sanitizeKey(input string) string {
 
 func calculatePossibleOutcomes(digits int) int {
 	return int(math.Pow10(digits))
-}
-
-func worker(id int, prefix string, length int, resultChan chan<- CodeResult, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
-	defer wg.Done()
-
-	for {
-		select {
-		case <-done:
-			return // Exit the worker when done signal is received
-		default:
-			newCode := generateCodeWithPool(prefix, length)
-			_, loaded := seenCodes.LoadOrStore(newCode, struct{}{})
-			if !loaded {
-				resultChan <- CodeResult{Code: newCode}
-			}
-
-		}
-	}
 }
 
 func clearLine() {
