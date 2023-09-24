@@ -88,8 +88,22 @@ func main() {
 	if flag.NFlag() == 0 {
 		utils.Banner()
 		fmt.Println()
-		color.Green("%s %s %s %s %s", "Usage:\t", config.AppCommand, "[-p prefix] [-l length_number] [-n total_codes]\t\nexample:", config.AppCommand, "-p=FT -l=6 -n=100\t\n")
-		color.Cyan("Options:\t\n\t-p\tAdd prefix to the codes (2-6 characters)\t\n\t-l\tThe length of the generated code number (4-16 digits)\t\n\t-n\tThe number of generated codes (1-100 million)\t\n\t-a\tAdd line numbers to the file\t\n\t-v\tAbout\t\n\t\n")
+		color.Green(
+			"%s %s %s %s %s",
+			"Usage:\t",
+			config.AppCommand,
+			"[-p prefix] [-l length_number] [-n total_codes]\t\nexample:",
+			config.AppCommand,
+			"-p=FT -l=6 -n=100\t\n",
+		)
+		color.Cyan(`Options:	
+	-p	Add prefix to the codes (2-6 characters)	
+	-l	The length of the generated code number (4-16 digits)	
+	-n	The number of generated codes (1-100 million)	
+	-a	Add line numbers to the file	
+	-v	About	
+	
+`)
 		color.Yellow("Tip: To stop code generation midway, simply press [CTRL + C]\n")
 		return
 	}
@@ -120,10 +134,9 @@ func main() {
 		}
 		psb := calculatePossibleOutcomes(config.Length)
 		if psb == config.NumCodes {
-			c := color.New(color.BgYellow, color.FgBlack).Sprint("Attention:")
-			att := color.New(color.FgHiYellow).Add(color.Italic).Sprint("Code generation and saving may take a bit longer than usual based on the provided parameters!")
-			fmt.Printf("%s %s\n",
-				c, att)
+			c, att := color.New(color.BgYellow, color.FgBlack).Sprint("Attention:"),
+				color.New(color.FgHiYellow).Add(color.Italic).Sprint("\nCode generation and saving may take a bit longer than usual based on the provided parameters!\n")
+			fmt.Printf("%s %s\n", c, att)
 		}
 		if config.NumCodes > psb {
 			c := color.New(color.BgYellow, color.FgBlack).Sprint("Warning")
@@ -150,7 +163,12 @@ func main() {
 			return
 		}
 
-		filePath := filepath.Join(path, fmt.Sprintf("[%s]-%s_%v.txt", config.Prefix, config.CodeTx, sanitizeKey(hash)))
+		filePath := filepath.Join(path, fmt.Sprintf(
+			"[%s]-%s_%v.txt",
+			config.Prefix,
+			config.CodeTx,
+			sanitizeKey(hash),
+		))
 
 		file, err := os.Create(filePath)
 		if err != nil {
@@ -168,14 +186,12 @@ func main() {
 
 		done := make(chan struct{}) // Signal channel to notify workers to exit
 		var wg sync.WaitGroup
-		seenCodes := sync.Map{}
-
 		resultChan := make(chan CodeResult, numWorkers) // Buffered channel for worker results
 
 		// Create worker pool
 		for i := 0; i < numWorkers; i++ {
 			wg.Add(1)
-			go worker(i, config.Prefix, config.Length, resultChan, done, &wg, &seenCodes)
+			go worker(config.Prefix, config.Length, resultChan, done, &wg)
 		}
 
 		// Write generated codes to file
@@ -183,7 +199,15 @@ func main() {
 			codesBuffer := bufio.NewWriter(file)
 
 			// Generate the initial header and add it to the buffer
-			_, _ = fmt.Fprintf(codesBuffer, "%s %s %v\n%s\n%s\n", humanize.Comma(int64(config.NumCodes)), config.FLineF, time.Now().Format("2006-01-02 15:04:05"), config.HelpF, strings.Repeat("-", 96))
+			_, _ = fmt.Fprintf(
+				codesBuffer,
+				"%s %s %v\n%s\n%s\n",
+				humanize.Comma(int64(config.NumCodes)),
+				config.FLineF,
+				time.Now().Format("2006-01-02 15:04:05"),
+				config.HelpF,
+				strings.Repeat("-", 96),
+			)
 
 			startTime := time.Now()
 			for i := 1; i <= config.NumCodes; i++ {
@@ -204,7 +228,10 @@ func main() {
 
 			close(done) // Signal workers to exit
 			ready = true
-			codesBuffer.Flush()
+			err := codesBuffer.Flush()
+			if err != nil {
+				log.Fatalf("error during buffer flashing: %v", err)
+			}
 		}()
 
 		for {
@@ -212,15 +239,30 @@ func main() {
 			case <-loadingTicker.C:
 				fmt.Print("\033[?25l")
 
-				info := color.New(color.FgBlack, color.BgGreen).Sprintf("[ST: %.2f%% | RM: %s]", percentage, utils.FormatDuration(config.RemainingTime))
-				fmt.Printf("\r%s Generating %s codes with prefix '%s' %s%10s", loadingAnimation(loadingCounter), humanize.Comma(int64(config.NumCodes)), config.Prefix, info, "")
+				info := color.New(
+					color.FgBlack,
+					color.BgGreen,
+				).Sprintf(
+					"[ST: %.2f%% | RM: %s]",
+					percentage,
+					utils.FormatDuration(config.RemainingTime),
+				)
+
+				fmt.Printf(
+					"\r%s Generating %s codes with prefix '%s' %s%10s",
+					loadingAnimation(loadingCounter),
+					humanize.Comma(int64(config.NumCodes)),
+					config.Prefix,
+					info,
+					"",
+				)
 				loadingCounter = (loadingCounter + 1) % 2
 
 				if ready {
 					clearLine()
 					fmt.Print("\033[?25h")
 					color.Yellow("Generated codes saved to %s\r\n", filePath)
-					file.Close()
+					_ = file.Close()
 					if runtime.GOOS == "windows" {
 						c := color.New(color.BgGreen, color.FgBlack).Sprint("Press 'O' to open directory")
 						fmt.Printf("%s or any key to exit\r\n", c)
@@ -228,7 +270,6 @@ func main() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						defer keyboard.Close()
 
 						char, _, err := keyboard.GetKey()
 						if err != nil {
@@ -247,7 +288,7 @@ func main() {
 			case <-sigChan:
 				fmt.Print("\033[?25h")
 				if file != nil {
-					file.Close()
+					_ = file.Close()
 				}
 				files, _ := os.ReadDir(path)
 				if len(files) == 1 {
@@ -288,7 +329,13 @@ func generateCodeWithPool(prefix string, length int) string {
 
 var filter = bloom.NewWithEstimates(maxNumCodes, falsePositiveRate)
 
-func worker(id int, prefix string, length int, resultChan chan<- CodeResult, done <-chan struct{}, wg *sync.WaitGroup, seenCodes *sync.Map) {
+func worker(
+	prefix string,
+	length int,
+	resultChan chan<- CodeResult,
+	done <-chan struct{},
+	wg *sync.WaitGroup,
+) {
 	defer wg.Done()
 
 	duplicatesFound := 0
