@@ -33,10 +33,10 @@ const (
 	maxPrefixLength   = 6
 	minCodeLength     = 4
 	maxCodeLength     = 16
-	maxNumCodes       = 100000000
+	maxNumCodes       = 1000000000
 	charset           = "0123456789"
 	numWorkers        = 200
-	falsePositiveRate = 0.000000001
+	falsePositiveRate = 0.0000000001
 )
 
 type AppConfig struct {
@@ -58,19 +58,13 @@ type CodeResult struct {
 	Code string
 }
 
-var stringBuilderPool = sync.Pool{
-	New: func() interface{} {
-		return &strings.Builder{}
-	},
-}
-
 func main() {
 	var config AppConfig
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.StringVar(&config.Prefix, "p", "", "Add prefix to the codes[2-6 characters]")
 	flag.IntVar(&config.Length, "l", 6, "The length of the generated numbers[4-16 digits]")
-	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-100 million]")
+	flag.IntVar(&config.NumCodes, "n", 1, "The number of generated codes[1-1 billion]")
 	flag.BoolVar(&config.LineNumbers, "a", false, "Add line numbers to the file")
 	flag.BoolVar(&config.Version, "v", false, "About")
 	flag.Parse()
@@ -99,7 +93,7 @@ func main() {
 		color.Cyan(`Options:	
 	-p	Add prefix to the codes (2-6 characters)	
 	-l	The length of the generated code number (4-16 digits)	
-	-n	The number of generated codes (1-100 million)	
+	-n	The number of generated codes (1-1 billion)	
 	-a	Add line numbers to the file	
 	-v	About	
 	
@@ -129,7 +123,7 @@ func main() {
 		}
 		if config.NumCodes <= 0 || config.NumCodes > maxNumCodes {
 			c := color.New(color.BgRed, color.FgBlack).Sprint("Error")
-			fmt.Printf("%s Number of codes should be between 1 and %d\n", c, maxNumCodes)
+			fmt.Printf("%s Number of codes should be between 1 and %s\n", c, humanize.Comma(maxNumCodes))
 			return
 		}
 		psb := calculatePossibleOutcomes(config.Length)
@@ -310,6 +304,12 @@ func main() {
 
 func init() {
 	rand.NewSource(time.Now().UnixNano())
+}
+
+var stringBuilderPool = sync.Pool{
+	New: func() interface{} {
+		return &strings.Builder{}
+	},
 }
 
 func generateCodeWithPool(prefix string, length int) string {

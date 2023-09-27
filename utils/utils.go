@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-func CalculateRemainingTime(elapsedTime time.Duration, currentIteration, remainingIterations int) time.Duration {
+func CalculateRemainingTime(
+	elapsedTime time.Duration,
+	currentIteration, remainingIterations int,
+) time.Duration {
 	averageIterationTime := elapsedTime / time.Duration(currentIteration)
 	return averageIterationTime * time.Duration(remainingIterations)
 }
