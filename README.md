@@ -1,6 +1,8 @@
 # A CLI tool for generating unique, randomized codes
 
-**FAST & OPTIMIZED (Creating & storing 1M unique random codes in just 1 second)**
+> [!NOTE]
+> **Swift and Optimized Performance: Generating and Storing 1 Million Unique Random Codes in Merely 1 Second**
+
 <p align="center">
   
 ![rere](https://github.com/jamalkaksouri/code-generation/assets/12379287/0f5a7bba-3202-4a73-9acc-93384861979d)
@@ -11,6 +13,14 @@
 
 </p>
 
+## Tested Environment
+
+This project has been tested on the following machine:
+
+> - **Laptop Model:** Dell Precision M6600
+> - **Processor:** Intel(R) Core(TM) i7-2720QM CPU @ 2.20GHz 2201 Mhz, 4 Core(s), 8 Logical Processor(s)
+> - **RAM:** 12.0 GB
+> - **Operating System:** Windows 10 Enterprise
 
 
 
